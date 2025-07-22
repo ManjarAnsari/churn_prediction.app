@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import shap
 import joblib
 import os
@@ -85,14 +86,14 @@ elif option == "Train Model":
                 ]), num_cols),
                 ('cat', Pipeline([
                     ('imputer', SimpleImputer(strategy='most_frequent')),
-                    ('encoder', OneHotEncoder(handle_unknown='ignore'))
+                    ('encoder', OneHotEncoder(handle_unknown='ignore', sparse=False))
                 ]), cat_cols)
             ])
 
             # XGBoost Model
             model = Pipeline([
                 ('preprocessor', preprocessor),
-                ('classifier', xgb.XGBClassifier(eval_metric='logloss'))
+                ('classifier', xgb.XGBClassifier(eval_metric='logloss', use_label_encoder=False))
             ])
 
             # Train model
@@ -105,18 +106,20 @@ elif option == "Train Model":
 
             # SHAP Feature Importance
             st.subheader("Feature Importance (SHAP)")
+
             # Transform features
             X_transformed = model.named_steps['preprocessor'].transform(X)
-            classifier = model.named_steps['classifier']
+            feature_names = model.named_steps['preprocessor'].get_feature_names_out()
+            X_transformed_df = pd.DataFrame(X_transformed, columns=feature_names)
 
-            # Use SHAP for feature importance
-            explainer = shap.TreeExplainer(classifier)
-            shap_values = explainer.shap_values(X_transformed)
+            # SHAP explainer on the XGBClassifier
+            explainer = shap.Explainer(model.named_steps['classifier'], X_transformed_df)
+            shap_values = explainer(X_transformed_df)
 
-            # Plot SHAP
             fig, ax = plt.subplots()
-            shap.summary_plot(shap_values, X_transformed, show=False)
+            shap.summary_plot(shap_values, X_transformed_df, show=False)
             st.pyplot(fig)
+            plt.close(fig)
 
             # ✅ Download trained model
             with open(model_path, "rb") as f:
