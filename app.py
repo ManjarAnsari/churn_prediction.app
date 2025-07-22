@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import shap
 import joblib
 import os
@@ -93,7 +92,7 @@ elif option == "Train Model":
             # XGBoost Model
             model = Pipeline([
                 ('preprocessor', preprocessor),
-                ('classifier', xgb.XGBClassifier(eval_metric='logloss', use_label_encoder=False))
+                ('classifier', xgb.XGBClassifier(eval_metric='logloss'))
             ])
 
             # Train model
@@ -106,12 +105,17 @@ elif option == "Train Model":
 
             # SHAP Feature Importance
             st.subheader("Feature Importance (SHAP)")
-            explainer = shap.Explainer(model.named_steps['classifier'])
-            shap_values = explainer(model.named_steps['preprocessor'].transform(X))
+            # Transform features
+            X_transformed = model.named_steps['preprocessor'].transform(X)
+            classifier = model.named_steps['classifier']
+
+            # Use SHAP for feature importance
+            explainer = shap.TreeExplainer(classifier)
+            shap_values = explainer.shap_values(X_transformed)
 
             # Plot SHAP
             fig, ax = plt.subplots()
-            shap.summary_plot(shap_values, features=model.named_steps['preprocessor'].transform(X), show=False)
+            shap.summary_plot(shap_values, X_transformed, show=False)
             st.pyplot(fig)
 
             # ✅ Download trained model
